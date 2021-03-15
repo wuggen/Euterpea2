@@ -28,11 +28,13 @@
 > import Control.Concurrent
 > import Control.Concurrent.STM.TChan
 > import Control.Monad.STM (atomically)
+> import Control.Monad (when, void)
 > import Data.IORef
 
 > import Data.Bits (shiftR, shiftL, (.|.), (.&.))
 > import Data.List (findIndex)
-> import Data.Maybe (mapMaybe)
+> import Data.Maybe (mapMaybe, fromMaybe)
+> import Data.Functor ((<&>))
 > import qualified Data.Heap as Heap
 
 > import System.IO (hPutStrLn, stderr)
@@ -152,11 +154,9 @@ by devices.  We define them here.
 >       pop = do
 >         h <- get
 >         let Just (a, h') = Heap.view h
->         modifyIORef heapRef (\_ -> h')
+>         writeIORef heapRef h'
 >         return a
->       peek = do
->         h <- get
->         return $ Heap.viewHead h
+>       peek = Heap.viewHead <$> get
 >
 >   return $ PrioChannel get push pop peek
 
@@ -178,6 +178,7 @@ outDevMap is the global mapping.
 >                      (PrioChannel Time Message, -- priority channel
 >                       (Time, Message) -> IO (), -- sound output function
 >                       IO ()))]                  -- stop/terminate function
+> {-# NOINLINE outDevMap #-}
 > outDevMap = unsafePerformIO $ newIORef []
 
 
@@ -188,11 +189,13 @@ returns the Port Midi Stream associated with it).
 
 > outPort :: IORef [(OutputDeviceID, PMStream)]
 > inPort  :: IORef [(InputDeviceID,  PMStream)]
+> {-# NOINLINE outPort #-}
+> {-# NOINLINE inPort #-}
 > outPort = unsafePerformIO (newIORef [])
 > inPort  = unsafePerformIO (newIORef [])
 
 > lookupPort :: (Eq deviceid) => IORef [(deviceid, PMStream)] -> deviceid -> IO (Maybe PMStream)
-> lookupPort p i = readIORef p >>= (return . lookup i)
+> lookupPort p i = readIORef p <&> lookup i
 
 > addPort :: IORef [(deviceid, PMStream)] -> (deviceid, PMStream) -> IO ()
 > addPort p is = modifyIORef p (is:)
@@ -219,7 +222,7 @@ and clears the mapping entirely.  It also clears outPort and inPort.
 >   inits <- readIORef outDevMap
 >   mapM_ (\(_, (_,_out,stop)) -> stop) inits
 >   terminate
->   modifyIORef outDevMap (const [])
+>   writeIORef outDevMap []
 >   writeIORef outPort []
 >   writeIORef inPort []
 
@@ -319,11 +322,10 @@ played.  Otherwise, it is queued for later.
 > deliverMidiEvent devId (t,m) = do
 >   (pChan, out, _stop) <- getOutDev devId
 >   now <- getTimeNow
->   let deliver t m = do
+>   let deliver t m = do {
 >       if t == 0
 >         then out (now,m)
->         else push pChan (now+t) m
->
+>         else push pChan (now+t) m }
 >   case m of
 >     Std m -> deliver t m
 >     ANote c k v d -> do
@@ -343,9 +345,7 @@ priority queue whose time to play has come.
 >           Nothing     -> return ()
 >           Just (t,m)  -> do
 >             now <- getTimeNow
->             if t <= now
->               then out (now, m) >> pop pChan >> loop
->               else return ()
+>             when (t <= now) $ out (now, m) >> pop pChan >> loop
 >   loop
 >   return ()
 
@@ -449,7 +449,7 @@ use one and when to use the other.
 >     stop ch fin = atomically (unGetTChan ch Nothing) >> takeMVar fin
 >     output s ch wait evt@(_, m) = do
 >       atomically $ writeTChan ch (Just evt)
->       if isTrackEnd m then takeMVar wait else return ()
+>       when (isTrackEnd m) $ takeMVar wait
 >     pump s ch wait fin = loop
 >       where
 >         loop = do
@@ -458,7 +458,7 @@ use one and when to use the other.
 >             Nothing -> close s >> putMVar fin ()
 >             Just (t, msg) -> do
 >               now <- getTimeNow
->               if (t > now + 5)
+>               if t > now + 5
 >                 then atomically (unGetTChan ch e) >> threadDelay 10000 >> loop
 >                 else do
 >                   done <- process t msg
@@ -645,10 +645,10 @@ A conversion function from PortMidi PMMsgs to Codec.Midi Messages.
 >       where
 >         sendEvts start now [] = loop start s fin
 >         sendEvts start now (e@(PMEvent m t):l) = do
->           let t0 = maybe t id start
+>           let t0 = fromMaybe t start
 >           case msgToMidi $ decodeMsg m of
 >             Just m' -> do
 >               done <- callback (now + fromIntegral (t - t0) / 1E3, m')
->               if done then close s >> return () else sendEvts (Just t0) now l
+>               if done then void (close s) else sendEvts (Just t0) now l
 >             Nothing -> sendEvts (Just t0) now l
 

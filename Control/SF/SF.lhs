@@ -12,7 +12,7 @@
 > import Control.Arrow.Operations
 
 
-> newtype SF a b = SF { runSF :: (a -> (b, SF a b)) }
+> newtype SF a b = SF { runSF :: a -> (b, SF a b) }
 
 #if __GLASGOW_HASKELL__ >= 610
 > instance Category SF where

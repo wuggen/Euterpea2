@@ -87,7 +87,7 @@ The MIDI file header is built as described above.
 > padByte byteCount i = 
 >   let b = Byte.pack [fromIntegral i] 
 >       n = Byte.length b
->       padding = Byte.pack $ take (byteCount - n) $ repeat 0x00
+>       padding = Byte.pack $ replicate (byteCount - n) 0x00
 >   in  if n < byteCount then Byte.concat [padding, b] else b
 
 ================
@@ -195,7 +195,7 @@ Append flags to a string (note, the string must be BACKWARDS):
 > fixBinStrs :: [String] -> [String]
 > fixBinStrs xs = 
 >     let n = length xs
->         bits = take (n-1) (repeat '1') ++ "0"
+>         bits = replicate (n-1) '1' ++ "0"
 >     in  Prelude.zipWith (:) bits xs
 
 Pad a list from the left until it is a fixed length:

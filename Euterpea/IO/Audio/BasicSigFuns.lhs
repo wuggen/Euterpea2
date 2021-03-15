@@ -145,7 +145,7 @@ Like readFromTable, but with linear interpolation.
 > readFromTablei :: Table -> Double -> Double
 > readFromTablei (Table sz array _) pos = 
 >     let idx  = fromIntegral sz * pos  -- fractional "index" in table ([0,sz])
->         idx0 = (truncate idx) `mod` sz       :: Int
+>         idx0 = truncate idx `mod` sz       :: Int
 >         idx1 = idx0 + 1                      :: Int
 >         val0 = array `unsafeAt` idx0
 >         val1 = array `unsafeAt` idx1
@@ -189,7 +189,7 @@ and (size of table - 1), inclusive).
 >             Table -> Bool -> ArrowP a p Double Double
 > tableiIx tab@(Table sz array _) True =
 >     proc idx -> do
->       let idx0 = (truncate idx) `mod` sz
+>       let idx0 = truncate idx `mod` sz
 >           val0 = readFromTableRaw tab idx0
 >           val1 = readFromTableRaw tab (idx0 + 1)
 >       outA -< val0 + (val1 - val0) * (idx - fromIntegral idx0)
@@ -423,7 +423,7 @@ modified feedback loops.
 >     poke p u
 >     return x'
 
-> peekBuf (Buf sz a) i = peek (a `advancePtr` (min (sz-1) i))
+> peekBuf (Buf sz a) i = peek (a `advancePtr` min (sz-1) i)
 
 TODO: deal with pre-initialized buffers
 
@@ -583,7 +583,7 @@ Adjusts RMS amplitude of 'sig' so that it matches RMS amplitude of 'ref'.
 >         (sqrsum, refsum) <- delay (0, 0) -< (sqrsum', refsum')
 >         let sqrsum' = c1 * sig * sig + c2 * sqrsum
 >             refsum' = c1 * ref * ref + c2 * refsum
->             ratio   = if sqrsum == 0 then sqrt $ refsum
+>             ratio   = if sqrsum == 0 then sqrt refsum
 >                                      else sqrt $ refsum / sqrsum
 >       outA -< sig * ratio
 >   where sr = rate (undefined :: p)
@@ -1114,7 +1114,7 @@ Utility functions for tableExpon and tableLinear.
 > normalizeSegs :: [(SegLength, entPt)] -> [(SegLength, entPt)]
 > normalizeSegs segs =
 >     let s = sum (map fst segs)
->         fact = if (s > 1) then (1/s) else 1 -- don't force max<1 up to max=1
+>         fact = if s > 1 then 1/s else 1 -- don't force max<1 up to max=1
 >     in  map (\(x,y) -> (x*fact, y)) segs
 
 > interpLine :: StartPt
@@ -1149,7 +1149,7 @@ endpoints for each pair of points.
 >     let  h = e2 - e1 
 >          x = if h<0 then s2-d else d
 >     in   if s2<=0 then e2 else -- accomodate discontinuities
->          (abs h)*((exp (x/s2))-1)/((exp 1)-1) + (min e1 e2)
+>          abs h * (exp (x/s2) - 1) / exp 1 - 1 + min e1 e2
 
 > interpStraightLine :: (Double, StartPt)
 >                  -- The startpoing as (x,y)
@@ -1190,8 +1190,7 @@ For a particular point, sum all partials.
 >                      -> Double
 >                         -- The x coordinate for which to find f(x)=y
 >                      -> Double
-> makeCompositeSineFun []     x = 0
-> makeCompositeSineFun (p:ps) x = makeSineFun p x + makeCompositeSineFun ps x
+> makeCompositeSineFun ps x = foldr (\ p -> (+) (makeSineFun p x)) 0 ps
 
 
 --------------------------------------
@@ -1203,7 +1202,7 @@ For a particular point, sum all partials.
 
 > timeBuilder :: forall p . Clock p => Double -> Signal p () (SEvent ())
 > timeBuilder d =
->     let r = (rate (undefined :: p))*d
+>     let r = rate (undefined :: p) * d
 >     in proc _ -> do
 >         rec i <- delay 0 -< if i >= r then i-r else i+1
 >         outA -< if i < 1 then Just () else Nothing

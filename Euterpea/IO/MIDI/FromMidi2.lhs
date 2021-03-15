@@ -97,7 +97,7 @@ onset and duration and places them together in Chord chunks.
 > chunkChord [] = []
 > chunkChord (c:cs) = 
 >     let cChord = filter (chordWith c) cs
->         notInChord = filter (\v -> not $ elem v cChord) cs
+>         notInChord = filter (`notElem` cChord) cs
 >     in  if null cChord then c : chunkChord cs
 >         else Chord (c:cChord) : chunkChord notInChord
 
@@ -113,7 +113,7 @@ permitted, so notes separated by rests will not be grouped here.
 > chunkMel [] = []
 > chunkMel x@(c:cs) = 
 >     let cMel = buildMelFrom (chunkOnset c) x -- get ALL possible melody elements
->         notInMel = filter (\v -> not $ elem v cMel) x
+>         notInMel = filter (`notElem` cMel) x
 >     in  if null cMel then c : chunkMel cs
 >         else Seq cMel : chunkMel notInMel
 
@@ -132,7 +132,7 @@ chunks in a greedy fashion.
 > chunkSeqs [] = []
 > chunkSeqs x@(c:cs) = 
 >     let s = seqWithRests (chunkOnset c) x
->         notInS = filter (\v -> not $ elem v s) x
+>         notInS = filter (`notElem` s) x
 >     in  if s == [c] then c : chunkSeqs cs 
 >         else Seq s : chunkSeqs notInS
 
@@ -188,16 +188,16 @@ First, some functions to pretty-up printing of things for debugging purposes
 > doubleShow :: Rational -> String
 > doubleShow x = show (fromRational x :: Double)
 
-> pcShow :: AbsPitch -> String
-> pcShow = show . fst . pitch
+> pcShow :: PitchLike a => a -> String
+> pcShow = show . pitchClass . pitch
 
 > listShow, listShowN :: (Show a) => [a] -> String
-> listShow x = "["++(concat $ intersperse ", " $ map show x)++"]"
-> listShowN x = "[\n    "++(concat $ intersperse ",\n    " $ map show x)++"\n]"
+> listShow x = "[" ++ intercalate ", " (map show x) ++ "]"
+> listShowN x = "[\n    "++ intercalate ",\n    " (map show x)++"\n]"
 
 > listShowX :: (Show a) => Int -> [a] -> String
-> listShowX i x = let v = concat (take i (repeat " ")) in
->     "[\n"++v++(concat $ intersperse (",\n"++v) $ map show x)++"\n"++v++"]"
+> listShowX i x = let v = concat (replicate i " ") in
+>     "[\n" ++ v ++ intercalate (",\n"++v) (map show x) ++ "\n" ++ v ++ "]"
 
 > instance Show Chunk where
 >     show (E e) = "E "++doubleShow (eTime e)++" "++pcShow (ePitch e)++" "++doubleShow (eDur e)

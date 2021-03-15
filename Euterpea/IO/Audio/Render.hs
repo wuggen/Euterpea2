@@ -50,7 +50,7 @@ type Evt a = (Double, NoteEvt a) -- Timestamp in seconds, and the note event
 
 -- Turn an Event into a NoteOn and a matching NoteOff with the same NodeId.  
 eventToEvtPair :: InstrMap a -> MEvent -> Int -> [Evt a]
-eventToEvtPair imap (MEvent {eTime, eInst, ePitch, eDur, eVol, eParams}) nid =
+eventToEvtPair imap MEvent {eTime, eInst, ePitch, eDur, eVol, eParams} nid =
     let instr = lookupInstr eInst imap
         tOn   = fromRational eTime
         tDur  = fromRational eDur :: Double

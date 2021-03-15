@@ -46,7 +46,7 @@
 
 > applyControls :: Music1 -> Music1
 > applyControls (Modify (Tempo r) m) = scaleDurations r $ applyControls m
-> applyControls (Modify (Transpose k) m) = shiftPitches1 k $ applyControls m
+> applyControls (Modify (Transpose k) m) = shiftPitches k $ applyControls m
 > applyControls (Modify x m) = Modify x $ applyControls m
 > applyControls (m1 :+: m2) = applyControls m1 :+: applyControls m2
 > applyControls (m1 :=: m2) = applyControls m1 :=: applyControls m2
@@ -84,7 +84,7 @@
 >  let  pfd@(pf,dur)  =  phraseToMEvents c pas m
 >       loud x        =  phraseToMEvents c (Dyn (Loudness x) : pas) m
 >       stretch x     =  let  t0 = eTime (head pf);  r  = x/dur
->                             upd (e@MEvent {eTime = t, eDur = d}) = 
+>                             upd e@MEvent {eTime = t, eDur = d} = 
 >                               let  dt  = t-t0
 >                                    t'  = (1+dt*r)*dt + t0
 >                                    d'  = (1+(2*dt+d)*r)*d
@@ -92,7 +92,7 @@
 >                        in (map upd pf, (1+x)*dur)
 >       inflate x     =  let  t0  = eTime (head pf);  
 >                             r   = x/dur
->                             upd (e@MEvent {eTime = t, eVol = v}) = 
+>                             upd e@MEvent {eTime = t, eVol = v} = 
 >                                 e {eVol =  round ( (1+(t-t0)*r) * 
 >                                            fromIntegral v)}
 >                        in (map upd pf, dur)
@@ -110,7 +110,7 @@
 >    Art (Staccato x)     ->  (map (\e-> e {eDur = x * eDur e}) pf, dur)
 >    Art (Legato x)       ->  (map (\e-> e {eDur = x * eDur e}) pf, dur)
 >    Art (Slurred x)      -> 
->        let  lastStartTime  = foldr (\e t -> max (eTime e) t) 0 pf
+>        let  lastStartTime  = foldr (max . eTime) 0 pf
 >             setDur e       =   if eTime e < lastStartTime
 >                                then e {eDur = x * eDur e}
 >                                else e

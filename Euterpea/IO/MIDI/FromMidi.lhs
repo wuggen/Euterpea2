@@ -53,15 +53,23 @@ are represented by tuples of:
 > data SimpleMsg = SE (Rational, AbsPitch, Volume, Int, NEvent) |
 >               T (Rational, Rational)
 >   deriving (Eq, Show)
-> instance Ord (SimpleMsg) where
->     compare (SE(t,p,v,i,e)) (SE(t',p',v',i',e')) = 
->         if t<t' then LT else if t>t' then GT else EQ
->     compare (T(t,x)) (SE(t',p',v',i',e')) = 
->         if t<t' then LT else if t>t' then GT else EQ
->     compare (SE(t,p,v,i,e)) (T(t',x)) = 
->         if t<t' then LT else if t>t' then GT else EQ
->     compare (T(t,x)) (T(t',x')) =
->         if t<t' then LT else if t>t' then GT else EQ
+> instance Ord SimpleMsg where
+>     compare (SE(t,p,v,i,e)) (SE(t',p',v',i',e'))
+>       | t < t' = LT
+>       | t > t' = GT
+>       | otherwise = EQ
+>     compare (T(t,x)) (SE(t',p',v',i',e'))
+>       | t < t' = LT
+>       | t > t' = GT
+>       | otherwise = EQ
+>     compare (SE(t,p,v,i,e)) (T(t',x))
+>       | t < t' = LT
+>       | t > t' = GT
+>       | otherwise = EQ
+>     compare (T(t,x)) (T(t',x'))
+>       | t < t' = LT
+>       | t > t' = GT
+>       | otherwise = EQ
 
 The importFile function places track ticks (Ticks) in a format where 
 each value attached to a message represents the number of ticks that 
@@ -93,7 +101,7 @@ list represents a track in the original Midi.
 
 > midiToEvents :: Midi -> [[SimpleMsg]]
 > midiToEvents m = 
->     let ts = map (simplifyTrack 0) $ map (addTrackTicks 0) (tracks m) 
+>     let ts = map (simplifyTrack 0 . addTrackTicks 0) (tracks m) 
 >     in  distributeTempos $ map (map (applyTD $ timeDiv m)) ts where 
 >   simplifyTrack :: Int -> [(Ticks, Message)] -> [SimpleMsg]
 >   simplifyTrack icur [] = []
@@ -156,7 +164,7 @@ Tempo changes are processed within each instrument.
 > eventsToMusic :: [[SimpleMsg]] -> Music (Pitch, Volume)
 > eventsToMusic tracks = 
 >     let tracks' = splitByInstruments tracks -- handle any mid-track program changes
->         is = map toInstr $ map getInstrument $ filter (not.null) tracks' -- instruments
+>         is = map (toInstr . getInstrument) $ filter (not.null) tracks' -- instruments
 >         tDef = 500000 -- current tempo, 120bpm as microseconds per qn
 >     in  chord $ zipWith instrument is $ map (seToMusic tDef) tracks' where
 >   
@@ -169,10 +177,10 @@ Tempo changes are processed within each instrument.
 >     let piMatch (SE(t1,p1,v1,ins1,e1)) = (p1==p && ins1==ins) && e1==Off
 >         piMatch (T(t1,x)) = False
 >         is = findIndices piMatch es -- find mactching note-offs
->         SE(t1,p1,v1,ins1, e) = es !! (is !! 0) -- pick the first matching note-off
+>         SE(t1,p1,v1,ins1, e) = es !! head is -- pick the first matching note-off
 >         n = (rest t :+: note (t1-t) (pitch p,v)) -- create a Music note
 >     in  if v > 0 then -- a zero volume note is silence
->              if length is > 0 then n :=: seToMusic tCurr es -- found an off
+>              if not (null is) then n :=: seToMusic tCurr es -- found an off
 >              else seToMusic tCurr ((e1:es)++[correctOff e1 es]) -- missing off case
 >         else seToMusic tCurr es
 >   seToMusic tCurr (e1@(T (t,newTempo)):es) = 
@@ -210,9 +218,9 @@ instrument assignments occur at the outermost level of the Music.
 > splitByInstruments (t:ts) = 
 >     let i = getInstrument t
 >         (t',t'') = splitByI i t
->         ts' = if or $ map isSE t'' then splitByInstruments (t'':ts) 
+>         ts' = if any isSE t'' then splitByInstruments (t'':ts) 
 >               else splitByInstruments ts
->     in  if or $ map isSE t' then t' : ts' else ts'
+>     in  if any isSE t' then t' : ts' else ts'
 
 > isSE :: SimpleMsg -> Bool
 > isSE (SE xs) = True
@@ -260,7 +268,7 @@ in this representation, so channel 1 is 0, channel 10 is 9, etc.
 
 > makeUPM :: [InstrumentName] -> UserPatchMap
 > makeUPM is = 
->     case findIndex (==Percussion) is of 
+>     case elemIndex Percussion is of 
 >         Nothing -> zip is ([0..8]++[10..]) -- no percussion
 >         Just i -> (is !! i, 9) : 
 >                   zip (take i is ++ drop (i+1) is) ([0..8]++[10..])

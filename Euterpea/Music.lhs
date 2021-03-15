@@ -1,13 +1,15 @@
 
-> {-#  LANGUAGE FlexibleInstances, TypeSynonymInstances  #-}
+> {-#  LANGUAGE FlexibleInstances, TypeSynonymInstances, TupleSections  #-}
 
 > module Euterpea.Music where
 
 > infixr 5 :+:, :=:
 
+> data Pitch = Pitch { pitchClass :: PitchClass, octave :: Octave }
+>   deriving (Show, Eq, Ord, Read)
+
 > type AbsPitch = Int
 > type Octave = Int
-> type Pitch = (PitchClass, Octave)
 > type Dur   = Rational
 > data PitchClass  =  Cff | Cf | C | Dff | Cs | Df | Css | D | Eff | Ds
 >                  |  Ef | Fff | Dss | E | Ff | Es | F | Gff | Ess | Fs
@@ -122,8 +124,8 @@
 
 > type Volume = Int
 
-> addVolume    :: Volume -> Music Pitch -> Music (Pitch,Volume)
-> addVolume v  = mMap (\p -> (p,v))
+> addVolume    :: Volume -> Music a -> Music (a, Volume)
+> addVolume v  = mMap (, v)
 
 > data NoteAttribute =
 >         Volume  Int   --  MIDI convention: 0=min, 127=max
@@ -144,15 +146,15 @@ the MEvent framework.
 >     toMusic1 :: Music a -> Music1
 
 > instance ToMusic1 Pitch where
->     toMusic1 = mMap (\p -> (p, []))
+>     toMusic1 = mMap (, [])
 
 > instance ToMusic1 (Pitch, Volume) where
 >     toMusic1  = mMap (\(p, v) -> (p, [Volume v]))
 
-> instance ToMusic1 (Note1) where
+> instance ToMusic1 Note1 where
 >     toMusic1 = id
 
-> instance ToMusic1 (AbsPitch) where
+> instance ToMusic1 AbsPitch where
 >     toMusic1 = mMap (\a -> (pitch a, []))
 
 > instance ToMusic1 (AbsPitch, Volume) where
@@ -165,42 +167,42 @@ the MEvent framework.
 > rest d          = Prim (Rest d)
 
 > tempo           :: Dur -> Music a -> Music a
-> tempo r m       = Modify (Tempo r) m
+> tempo r         = Modify (Tempo r)
 
 > transpose       :: AbsPitch -> Music a -> Music a
-> transpose i m   = Modify (Transpose i) m
+> transpose i     = Modify (Transpose i)
 
 > instrument      :: InstrumentName -> Music a -> Music a
-> instrument i m  = Modify (Instrument i) m
+> instrument i    = Modify (Instrument i)
 
 > phrase          :: [PhraseAttribute] -> Music a -> Music a
-> phrase pa m     = Modify (Phrase pa) m
+> phrase pa       = Modify (Phrase pa)
 
 > keysig          :: PitchClass -> Mode -> Music a -> Music a
-> keysig pc mo m  = Modify (KeySig pc mo) m
+> keysig pc mo    = Modify (KeySig pc mo)
 
 > cff,cf,c,cs,css,dff,df,d,ds,dss,eff,ef,e,es,ess,fff,ff,f,
 >   fs,fss,gff,gf,g,gs,gss,aff,af,a,as,ass,bff,bf,b,bs,bss ::
 >     Octave -> Dur -> Music Pitch
 
-> cff  o d = note d (Cff,  o);  cf   o d = note d (Cf,   o)
-> c    o d = note d (C,    o);  cs   o d = note d (Cs,   o)
-> css  o d = note d (Css,  o);  dff  o d = note d (Dff,  o)
-> df   o d = note d (Df,   o);  d    o d = note d (D,    o)
-> ds   o d = note d (Ds,   o);  dss  o d = note d (Dss,  o)
-> eff  o d = note d (Eff,  o);  ef   o d = note d (Ef,   o)
-> e    o d = note d (E,    o);  es   o d = note d (Es,   o)
-> ess  o d = note d (Ess,  o);  fff  o d = note d (Fff,  o)
-> ff   o d = note d (Ff,   o);  f    o d = note d (F,    o)
-> fs   o d = note d (Fs,   o);  fss  o d = note d (Fss,  o)
-> gff  o d = note d (Gff,  o);  gf   o d = note d (Gf,   o)
-> g    o d = note d (G,    o);  gs   o d = note d (Gs,   o)
-> gss  o d = note d (Gss,  o);  aff  o d = note d (Aff,  o)
-> af   o d = note d (Af,   o);  a    o d = note d (A,    o)
-> as   o d = note d (As,   o);  ass  o d = note d (Ass,  o)
-> bff  o d = note d (Bff,  o);  bf   o d = note d (Bf,   o)
-> b    o d = note d (B,    o);  bs   o d = note d (Bs,   o)
-> bss  o d = note d (Bss,  o)
+> cff  o d = note d (Pitch Cff  o);  cf   o d = note d (Pitch Cf  o)
+> c    o d = note d (Pitch C    o);  cs   o d = note d (Pitch Cs  o)
+> css  o d = note d (Pitch Css  o);  dff  o d = note d (Pitch Dff o)
+> df   o d = note d (Pitch Df   o);  d    o d = note d (Pitch D   o)
+> ds   o d = note d (Pitch Ds   o);  dss  o d = note d (Pitch Dss o)
+> eff  o d = note d (Pitch Eff  o);  ef   o d = note d (Pitch Ef  o)
+> e    o d = note d (Pitch E    o);  es   o d = note d (Pitch Es  o)
+> ess  o d = note d (Pitch Ess  o);  fff  o d = note d (Pitch Fff o)
+> ff   o d = note d (Pitch Ff   o);  f    o d = note d (Pitch F   o)
+> fs   o d = note d (Pitch Fs   o);  fss  o d = note d (Pitch Fss o)
+> gff  o d = note d (Pitch Gff  o);  gf   o d = note d (Pitch Gf  o)
+> g    o d = note d (Pitch G    o);  gs   o d = note d (Pitch Gs  o)
+> gss  o d = note d (Pitch Gss  o);  aff  o d = note d (Pitch Aff o)
+> af   o d = note d (Pitch Af   o);  a    o d = note d (Pitch A   o)
+> as   o d = note d (Pitch As   o);  ass  o d = note d (Pitch Ass o)
+> bff  o d = note d (Pitch Bff  o);  bf   o d = note d (Pitch Bf  o)
+> b    o d = note d (Pitch B    o);  bs   o d = note d (Pitch Bs  o)
+> bss  o d = note d (Pitch Bss  o)
 
 
 > bn, wn, hn, qn, en, sn, tn, sfn, dwn, dhn,
@@ -241,8 +243,32 @@ pitch 0 = (C,-1)
 pitch 60 = (C,4)
 pitch 127 = (G,9)
 
-> absPitch           :: Pitch -> AbsPitch
-> absPitch (pc,oct)  = 12*(oct+1) + pcToInt pc
+> class PitchLike a where
+>   pitch :: a -> Pitch
+>   absPitch :: a -> AbsPitch
+>
+>   setPitch :: Pitch -> a -> a
+>   setAbsPitch :: AbsPitch -> a -> a
+
+> instance PitchLike AbsPitch where
+>   pitch ap =
+>     let (oct, n) = divMod ap 12
+>     in Pitch ([C, Cs, D, Ds, E, F, Fs, G, Gs, A, As, B] !! n) (oct - 1)
+>   absPitch = id
+>   setPitch = const . absPitch
+>   setAbsPitch = const
+
+> instance PitchLike Pitch where
+>   pitch = id
+>   absPitch (Pitch pc oct) = 12 * (oct + 1) + pcToInt pc
+>   setPitch = const
+>   setAbsPitch = const . pitch
+
+> instance PitchLike a => PitchLike (a, b) where
+>   pitch = pitch . fst
+>   absPitch = absPitch . fst
+>   setPitch pNew (p, x) = (setPitch pNew p, x)
+>   setAbsPitch pNew (p, x) = (setAbsPitch pNew p, x)
 
 > pcToInt     :: PitchClass -> Int
 > pcToInt pc  = case pc of
@@ -254,13 +280,8 @@ pitch 127 = (G,9)
 >   Aff  -> 7;   Af  -> 8;   A  -> 9;   As  -> 10;  Ass  -> 11;
 >   Bff  -> 9;   Bf  -> 10;  B  -> 11;  Bs  -> 12;  Bss  -> 13
 
-> pitch     :: AbsPitch -> Pitch
-> pitch ap  =
->     let (oct, n) = divMod ap 12
->     in  ([C,Cs,D,Ds,E,F,Fs,G,Gs,A,As,B] !! n, oct-1)
-
-> trans      :: Int -> Pitch -> Pitch
-> trans i p  = pitch (absPitch p + i)
+> trans      :: PitchLike a => Int -> a -> a
+> trans i p  = setAbsPitch (absPitch p + i) p
 
 
 
@@ -294,26 +315,15 @@ pitch 127 = (G,9)
 > lineToList _                  =
 >     error "lineToList: argument not created by function line"
 
-> invertAt :: Pitch -> Music Pitch -> Music Pitch
-> invertAt pRef = mMap (\p -> pitch (2 * absPitch pRef - absPitch p))
+> invertAt :: PitchLike a => a -> Music a -> Music a
+> invertAt pRef = mMap (\p -> setAbsPitch (2 * absPitch pRef - absPitch p) p)
 
-> invertAt1 :: Pitch -> Music (Pitch, a) -> Music (Pitch, a)
-> invertAt1 pRef = mMap (\(p,x) -> (pitch (2 * absPitch pRef - absPitch p),x))
-
-> invert :: Music Pitch -> Music Pitch
+> invert :: PitchLike a => Music a -> Music a
 > invert m =
->     let pRef = mFold pFun (++) (++) (flip const) m
+>     let pRef = mFold pFun (++) (++) (const id) m
 >     in  if null pRef then m -- no pitches in the structure!
 >         else invertAt (head pRef) m
 >     where pFun (Note d p) = [p]
->           pFun _ = []
-
-> invert1 :: Music (Pitch,a) -> Music (Pitch,a)
-> invert1 m =
->     let pRef = mFold pFun (++) (++) (flip const) m
->     in  if null pRef then m -- no pitches!
->         else invertAt1 (head pRef) m
->     where pFun (Note d (p,x)) = [p]
 >           pFun _ = []
 
 > retro               :: Music a -> Music a
@@ -326,7 +336,7 @@ pitch 127 = (G,9)
 >    in if d1>d2  then retro m1 :=: (rest (d1-d2) :+: retro m2)
 >                 else (rest (d2-d1) :+: retro m1) :=: retro m2
 
-> retroInvert, invertRetro :: Music Pitch -> Music Pitch
+> retroInvert, invertRetro :: PitchLike a => Music a -> Music a
 > retroInvert  = retro  . invert
 > invertRetro  = invert . retro
 
@@ -396,7 +406,7 @@ To remove all zero duration values, use removeZeros.
 > durL :: Music a -> LazyDur
 > durL m@(Prim _)            =  [dur m]
 > durL (m1 :+: m2)           =  let d1 = durL m1
->                               in d1 ++ map (+(last d1)) (durL m2)
+>                               in d1 ++ map (+ last d1) (durL m2)
 > durL (m1 :=: m2)           =  mergeLD (durL m1) (durL m2)
 > durL (Modify (Tempo r) m)  =  map (/r) (durL m)
 > durL (Modify _ m)          =  durL m
@@ -484,11 +494,8 @@ To remove all zero duration values, use removeZeros.
 Sometimes we may wish to alter the internal structure of a Music value
 rather than wrapping it with Modify. The following functions allow this.
 
-> shiftPitches :: AbsPitch -> Music Pitch -> Music Pitch
+> shiftPitches :: PitchLike a => AbsPitch -> Music a -> Music a
 > shiftPitches k = mMap (trans k)
-
-> shiftPitches1 :: AbsPitch -> Music (Pitch, b) -> Music (Pitch, b)
-> shiftPitches1 k = mMap (\(p,xs) -> (trans k p, xs))
 
 > scaleDurations :: Rational -> Music a -> Music a
 > scaleDurations r (Prim (Note d p)) = note (d/r) p

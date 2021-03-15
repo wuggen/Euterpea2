@@ -96,7 +96,10 @@ outFileHelp' f filepath dur sf =
                     channelNumber = numChannels,
                     sampleData    = array }
   in exportFile filepath aud where
-      clipFix x = if x > 1.0 then 1.0 else if x < -1.0 then -1.0 else x
+      clipFix x
+        | x > 1.0 = 1.0
+        | x < - 1.0 = - 1.0
+        | otherwise = x
 
 
 {-

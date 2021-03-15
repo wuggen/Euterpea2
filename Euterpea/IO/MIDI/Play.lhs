@@ -108,7 +108,7 @@ note, even if there is a long computation offset prior to any sound.
 > playM' :: Maybe OutputDeviceID -> Midi -> IO ()
 > playM' devID midi = handleCtrlC $ do
 >     initialize
->     (maybe (defaultOutput playMidi) playMidi devID) midi
+>     maybe (defaultOutput playMidi) playMidi devID midi
 >     terminate
 >     return () where
 >     handleCtrlC :: IO a -> IO a
@@ -123,14 +123,14 @@ consuming to compute. Infinite parallelism is not supported.
 > playInf :: ToMusic1 a => PlayParams -> Music a -> IO ()
 > playInf p m = handleCtrlC $ do
 >     initializeMidi
->     (maybe (defaultOutput playRec) playRec (devID p)) $ musicToMsgs' p m
+>     maybe (defaultOutput playRec) playRec (devID p) $ musicToMsgs' p m
 >     threadDelay $ round (closeDelay p * 1000000)
 >     terminateMidi
 >     return () where
 >     handleCtrlC :: IO a -> IO a
 >     handleCtrlC op = do
 >         dev <- resolveOutDev (devID p)
->         onException op (stopMidiOut (dev) 16)
+>         onException op (stopMidiOut dev 16)
 
 Bug fix on Sept 24, 2018: on Mac, the default output device may not be zero.
 In rare cases on Mac, there are outputs but the default ID is Nothing, but
@@ -158,7 +158,7 @@ in these cases the default always seems to be the first output in the list.
 >     if t > 0 then threadDelay (toMicroSec t) >> playRec dev ((0,m):ms) else
 >     let mNow = x : takeWhile ((<=0).fst) ms
 >         mLater = drop (length mNow - 1) ms
->     in  doMidiOut dev (Just $ mNow) >> playRec dev mLater where
+>     in  doMidiOut dev (Just mNow) >> playRec dev mLater where
 >     doMidiOut dev Nothing = outputMidi dev
 >     doMidiOut dev (Just ms) = do
 >         outputMidi dev
@@ -251,10 +251,10 @@ is handled separately.
 > dynamicCP cLim pChan i cMap =
 >     if i==Percussion then (pChan, (i, pChan):cMap) else
 >         let cMapNoP = filter ((/=Percussion). fst) cMap
->             extra = if length cMapNoP == length cMap then [] else [(Percussion, pChan)]
+>             extra = [(Percussion, pChan) | length cMapNoP /= length cMap]
 >             newChan = snd $ last cMapNoP
 >         in  if length cMapNoP < cLim - 1 then linearCP cLim pChan i cMap
->         else (newChan, (i, newChan) : (take (length cMapNoP - 1) cMapNoP)++extra)
+>         else (newChan, (i, newChan) : take (length cMapNoP - 1) cMapNoP ++ extra)
 
 
 A predefined policy will send instruments to user-defined channels. If new

@@ -30,6 +30,7 @@ structure of the particular Music value.
 > import Euterpea.Music
 > import Euterpea.IO.MIDI.ExportMidiFile
 > import Data.List
+> import Data.Maybe (fromMaybe)
 > import Codec.Midi
 
 > instNameOnly :: String -> String
@@ -40,7 +41,7 @@ structure of the particular Music value.
 > resolveInstrumentName x@(CustomInstrument s) =
 >     let iName = instNameOnly s
 >         allInsts = take 128 $ enumFrom AcousticGrandPiano
->         i = maybe (-1) id $ findIndex (==iName) $ map show $ allInsts
+>         i = fromMaybe (-1) $ elemIndex iName $ map show allInsts
 >     in  if i >= 0 then allInsts !! i else x
 > resolveInstrumentName x = x
 
@@ -57,8 +58,8 @@ structure of the particular Music value.
 > toMidiUPM2 upm pf =
 >    let split     = resolveMEventInsts $ splitByInst pf
 >        insts     = map fst split
->        rightMap  =  if (allValid upm insts) then upm
->                     else (makeGMMap insts)
+>        rightMap  =  if allValid upm insts then upm
+>                     else makeGMMap insts
 >    in Midi  (if length split == 1  then SingleTrack
 >                                    else MultiTrack)
 >             (TicksPerBeat division)
