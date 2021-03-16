@@ -319,6 +319,9 @@ instruments are found that are not accounted for, an error is thrown.
 > instance NFData PitchClass where
 >     rnf p = ()
 
+> instance NFData Pitch where
+>     rnf (Pitch pc o) = rnf pc `seq` rnf o
+
 > instance NFData Mode where
 >     rnf x = ()
 
