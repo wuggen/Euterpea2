@@ -1,3 +1,8 @@
+Heavily modified and expanded version of Euterpea.
+
+Original readme:
+
+```
 Version 2.0.8
 Last modified: 16-June-2019
 Website: http://www.euterpea.com
@@ -46,3 +51,4 @@ Please send any other questions and comments to Donya Quick
 
 Installation instructions and additional examples are available at
 the Euterpea website: http://www.euterpea.com
+```
