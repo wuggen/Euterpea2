@@ -33,7 +33,6 @@ import qualified Data.ByteString as Byte
 
 -- http://faydoc.tripod.com/formats/mid.htm
 
-
 makeFile :: Midi -> Byte.ByteString
 makeFile (Midi ft td trs) = 
     let ticksPerQn = 
@@ -278,4 +277,3 @@ exportMidiFile fn = Byte.writeFile fn . makeFile
 --  
 --  testA :: ToMusic1 a => PMap Note1 -> Context Note1 -> Music a -> IO ()
 --  testA pm con m = exportMidiFile "test.mid" (testMidiA pm con m)
---  

@@ -5,7 +5,6 @@ module Euterpea.IO.Audio.Types where
 import Control.Arrow.ArrowP
 import Control.SF.SF
 
-
 class Clock p where
     rate :: p -> Double  -- sampling rate
 

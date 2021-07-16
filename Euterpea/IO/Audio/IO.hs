@@ -3,7 +3,6 @@
 
 module Euterpea.IO.Audio.IO (
     outFile,  outFileNorm, 
---    outFileA, outFileNormA, RecordStatus, 
     maxSample) where
 
 import Control.Arrow.ArrowP
@@ -14,17 +13,6 @@ import Codec.Wav
 import Data.Audio
 import Data.Array.Unboxed
 import Data.Int
-
---import Data.IORef
---import Foreign.C
---import Foreign.Marshal.Array
---import Foreign.Marshal.Utils
---import Foreign.Ptr
---import Foreign.Storable
---import Control.CCA.Types
---import Control.Arrow
---import Control.Concurrent.MonadIO
---import Sound.RtAudio
 
 type Signal clk a b = ArrowP SF clk a b
 
@@ -71,14 +59,11 @@ outFileHelp f filepath dur sf =
                     sampleData    = array }
   in exportFile filepath aud
   
-{-
-Alternative definition of the above that enforces a clipping behavior when 
-the value exceeds the [-1.0, 1.0] range. The overflow behavior makes it 
-very hard to debug sound modeling problems that involve certain waveforms, 
-such as saw waves. Clipping is also a more common behavior in other audio 
-software rather than overflowing or wrap-around.
--}
-  
+-- | Alternative definition of the above that enforces a clipping behavior when 
+-- the value exceeds the [-1.0, 1.0] range. The overflow behavior makes it 
+-- very hard to debug sound modeling problems that involve certain waveforms, 
+-- such as saw waves. Clipping is also a more common behavior in other audio 
+-- software rather than overflowing or wrap-around.
 outFileHelp' :: forall a p. (AudioSample a, Clock p) => 
             ([Double] -> [Double]) -- ^ Post-processing function.
          -> String              -- ^ Filename to write to.
@@ -159,7 +144,7 @@ toSamples dur sf =
       numSamples  = truncate (dur * sr) * numChannels
   in take numSamples $ concatMap collapse $ unfold $ strip sf
 
--- | Compute the maximum sample of an SF in the first 'dur' seconds.
+-- | Compute the maximum sample of an SF in the first [dur] seconds.
 maxSample :: forall a p. (AudioSample a, Clock p) =>
              Double -> Signal p () a -> Double
 maxSample dur sf = maximum (map abs (toSamples dur sf))

@@ -14,7 +14,6 @@ import Control.Arrow
 import Control.Arrow.Operations
 import Control.Arrow.ArrowP
 
-
 outA :: (Arrow a) => a b b
 outA = arr id
 
@@ -35,7 +34,6 @@ countUp :: ArrowCircuit a => a () Int
 countUp = proc _ -> do
     rec i <- delay 0 -< i + 1
     outA -< i
-
 
 upsample :: forall a b c p1 p2. (ArrowChoice a, ArrowCircuit a, Clock p1, Clock p2, AudioSample c) 
          => ArrowP a p1 b c -> ArrowP a p2 b c

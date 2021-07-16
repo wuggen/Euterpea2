@@ -1,8 +1,7 @@
 {-# LANGUAGE Arrows, NoMonomorphismRestriction #-}
 
--- This module is strictly for backward compatibility with Euterpea 0.1.0,
+-- | This module is strictly for backward compatibility with Euterpea 0.1.0,
 -- which used many csound names for the basic signal functions.
-
 module Euterpea.IO.Audio.CSound where
 import Euterpea.IO.Audio.BasicSigFuns
 import Euterpea.IO.Audio.Basics

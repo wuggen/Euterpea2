@@ -3,8 +3,7 @@
              FunctionalDependencies, ScopedTypeVariables,
              NoMonomorphismRestriction #-}
 
--- Euterpea adaptation of some unit generators from csound
--- -------------------------------------------------------
+-- | Euterpea adaptation of some unit generators from csound.
 
 -- Conventions: 
 
@@ -18,12 +17,11 @@
 -- initialization pass.  They are represented as unlifted arguments here
 -- (i.e. non-signal).
 
--- (3) Many unit generators in csound take a signal 'amp' as input, which
--- scales its result by 'amp'.  Since this feature induces computational
+-- (3) Many unit generators in csound take a signal [amp] as input, which
+-- scales its result by [amp].  Since this feature induces computational
 -- overhead when scaling is not needed, and is easily expressed using
 -- arrow syntax when needed, we omit that functionality from Eutperpea's
 -- versions of the unit generators.
-
 module Euterpea.IO.Audio.BasicSigFuns (
   Table,
   pluck,
@@ -65,7 +63,6 @@ module Euterpea.IO.Audio.BasicSigFuns (
   samples, milliseconds, seconds, countTime
   ) where
 
-
 import Euterpea.IO.Audio.Basics
 import Euterpea.IO.Audio.Types
 import Control.Arrow
@@ -96,25 +93,22 @@ clip val lower upper
     | val >= upper = upper
     | otherwise    = val
 
--- Raises 'a' to the power 'b' using logarithms.
-
+-- | Raises [a] to the power [b] using logarithms.
 pow :: Floating a => a -> a -> a
 pow a b = exp (log a * b)
 
--- Returns the fractional part of 'x'.
-
+-- Returns the fractional part of [x].
 frac :: RealFrac r => r -> r
 frac = snd . properFraction
 
 -- Table Creation and Access
 -- -------------------------
 
--- A Table is essentially a UArray.
-
+-- | A Table is essentially a UArray.
 data Table = Table 
-    !Int                   -- size
-    !(UArray Int Double)   -- table implementation
-    !Bool                  -- Whether the table is normalized
+    !Int                   -- ^ Size.
+    !(UArray Int Double)   -- ^ Table implementation.
+    !Bool                  -- ^ Whether the table is normalized.
 
 instance Show Table where
     show (Table sz a n) = "Table with " ++ show sz ++ " entries: " ++ show a
@@ -140,8 +134,7 @@ readFromTableA = arr . readFromTable
 readFromTableRaw :: Table -> Int -> Double
 readFromTableRaw (Table _ a _) idx = a `unsafeAt` idx
 
--- Like readFromTable, but with linear interpolation.
-
+-- | Like readFromTable, but with linear interpolation.
 readFromTablei :: Table -> Double -> Double
 readFromTablei (Table sz array _) pos = 
     let idx  = fromIntegral sz * pos  -- fractional "index" in table ([0,sz])
@@ -155,13 +148,13 @@ readFromTablei (Table sz array _) pos =
 readFromTableiA :: Arrow a => Table -> a Double Double
 readFromTableiA = arr . readFromTablei
 
--- Accesses table values by direct indexing with linear interpolation.
--- The index 'pos' is expected to be normalized (between 0 and 1).  Values
+-- | Accesses table values by direct indexing with linear interpolation.
+--
+-- The index [pos] is expected to be normalized (between 0 and 1).  Values
 -- out of bounds are either clipped or wrapped.
-
 tablei :: (Clock p, Arrow a) => 
-          Table   -- Table to read from.
-       -> Bool    -- Whether to wrap around index; 
+          Table   -- ^ Table to read from.
+       -> Bool    -- ^ Whether to wrap around index; 
                   --   if not, index is clipped within bounds
        -> ArrowP a p Double Double
 tablei tab True =
@@ -171,9 +164,9 @@ tablei tab False =
     proc pos -> do
       outA -< readFromTablei tab (clip pos 0 1)
 
--- Accesses table values by direct indexing; the index is normalized
--- (between 0 and 1).
-
+-- | Accesses table values by direct indexing.
+--
+-- The index is normalized (between 0 and 1).
 table :: (Clock p, Arrow a) => Table -> Bool -> ArrowP a p Double Double
 table tab True =
     proc pos -> do 
@@ -182,9 +175,8 @@ table tab False =
     proc pos -> do
       outA -< readFromTable tab (clip pos 0 1)
 
--- Like tablei, but the index is interpreted as a raw value (between 0
+-- | Like tablei, but the index is interpreted as a raw value (between 0
 -- and (size of table - 1), inclusive).
-
 tableiIx :: (Clock p, Arrow a) => 
             Table -> Bool -> ArrowP a p Double Double
 tableiIx tab@(Table sz array _) True =
@@ -198,8 +190,7 @@ tableiIx tab@(Table sz _ _) False =
       let pos = idx / fromIntegral (sz-1)
       outA -< readFromTablei tab (clip pos 0 1)
 
--- Like table, but index interpreted as raw value.
-
+-- | Like table, but index interpreted as raw value.
 tableIx :: (Clock p, Arrow a) => Table -> Bool -> ArrowP a p Double Double
 tableIx tab@(Table sz array _) True =
     proc idx -> do
@@ -211,27 +202,26 @@ tableIx tab@(Table sz array _) False =
 -- Oscillators
 -- -----------
 
--- 'osc' generates periodic signals consisting of the values returned
--- from sampling a stored function table. The internal phase is
--- simultaneously advanced in accordance with the input signal 'freq'.
-
+-- | Generates periodic signals consisting of the values returned
+-- from sampling a stored function table.
+--
+-- The internal phase is simultaneously advanced in accordance with the input
+-- signal [freq].
 osc :: (Clock p, ArrowCircuit a) =>
          Table 
-      -> Double  -- Initial phase of sampling, expressed as a
+      -> Double  -- ^ Initial phase of sampling, expressed as a
                  -- fraction of a cycle (0 to 1).
       -> ArrowP a p Double Double
 osc table iphs = osc_ iphs >>> readFromTableA table
 
--- 'oscI' is like 'osc', but with linear interpolation.
-
+--  | Like [osc], but with linear interpolation.
 oscI :: (Clock p, ArrowCircuit a) => 
           Table 
        -> Double 
        -> ArrowP a p Double Double
 oscI table iphs = osc_ iphs >>> readFromTableiA table
 
--- Helper function for osc and oscI.
-
+-- | Helper function for [osc] and [oscI].
 osc_ :: forall p a. (Clock p, ArrowCircuit a) => 
           Double -> ArrowP a p Double Double
 osc_ phs = 
@@ -243,10 +233,9 @@ osc_ phs =
         next <- delay phs -< frac (phase + delta)
       outA -< phase
 
--- Simple, fast sine oscillator, that uses only one multiply and two add
+-- | Simple, fast sine oscillator, that uses only one multiply and two add
 -- operations to generate one sample of output, and does not require a
 -- function table.
-
 oscFixed :: forall p a . (Clock p, ArrowCircuit a) =>
             Double -> ArrowP a p () Double
 oscFixed freq =
@@ -262,35 +251,34 @@ oscFixed freq =
                outA -< r
   in sf
 
--- 'oscDur' accesses values by sampling once through the function table
--- at a rate determined by 'dur'. For the first 'del' seconds, the point
--- of scan will reside at the first location of the table; it will then
--- begin moving through the table at a constant rate, reaching the end in
--- another 'dur' seconds; from that time on (i.e. after 'del' + 'dur'
--- seconds) it will remain pointing at the last location. 
-
+-- | Accesses values by sampling once through the function table at a rate
+-- determined by [dur].
+--
+-- For the first [del] seconds, the point of scan will reside at the first
+-- location of the table; it will then begin moving through the table at a
+-- constant rate, reaching the end in another [dur] seconds; from that time on
+-- (i.e. after [del + dur] seconds) it will remain pointing at the last
+-- location. 
 oscDur :: (Clock p, ArrowChoice a, ArrowCircuit a) =>
           Table
        -> Double
-       -- delay in seconds before 'oscDur' incremental sampling begins
+       -- ^ Delay in seconds before [oscDur] incremental sampling begins
        -> Double
-       -- duration in seconds to sample through the table just once.
+       -- ^ Duration in seconds to sample through the table just once.
        -> ArrowP a p () Double
 oscDur = oscDur_ osc
 
--- Like 'oscDur', but with linear interpolation.
-
+-- | Like [oscDur], but with linear interpolation.
 oscDurI :: (Clock p, ArrowChoice a, ArrowCircuit a) => 
            Table
         -> Double                  
-           -- delay in seconds before 'oscDur' incremental sampling begins.
+           -- ^ Delay in seconds before [oscDur] incremental sampling begins.
         -> Double                  
-           -- duration in seconds to sample through the table just once.
+           -- ^ Duration in seconds to sample through the table just once.
         -> ArrowP a p () Double
 oscDurI = oscDur_ oscI
 
--- Helper function for oscDur and oscDurI.
-
+-- | Helper function for [oscDur] and [oscDurI].
 oscDur_ :: forall p a . (Clock p, ArrowChoice a, ArrowCircuit a) => 
            (Table -> Double -> ArrowP a p Double Double)
            -> Table -> Double -> Double -> ArrowP a p () Double
@@ -326,16 +314,15 @@ loscil table =
     proc freq -> do
       outA -< 0
 
--- Output a set of harmonically related sine partials.
-
+-- | Output a set of harmonically related sine partials.
 oscPartials :: forall p . Clock p => 
-        Table   -- table containing a sine wave;
-                -- a table size of at least 8192 is recommended.
-     -> Double  -- initial phase of the fundamental frequency,
+        Table   -- ^ Table containing a sine wave.
+                -- A table size of at least 8192 is recommended.
+     -> Double  -- ^ Initial phase of the fundamental frequency,
                 -- expressed as a fraction of a cycle (0 to 1).
      -> Signal p (Double,Int) Double 
-                -- 'freq' is the fundamental frequency in cycles per 
-                -- second; 'nharms' is the number of harmonics requested.
+                -- ^ [freq] is the fundamental frequency in cycles per 
+                -- second; [nharms] is the number of harmonics requested.
 oscPartials table initialPhase =
     let sr = rate (undefined :: p)
     in proc (freq, nharms) -> do
@@ -352,23 +339,25 @@ oscPartials table initialPhase =
 
 data PluckDecayMethod
     = SimpleAveraging
-      -- A simple smoothing process.
+      -- ^ A simple smoothing process.
     | StretchedAveraging Double  
-      -- Smoothing time stretched by a factor.
+      -- ^ Smoothing time stretched by a factor.
     | SimpleDrum Double
-      -- The range from pitch to noise is controlled by a 'roughness
-      -- factor' (0 to 1). Zero gives the plucked string effect, while
-      -- 1 reverses the polarity of every sample (octave down, odd
-      -- harmonics). The setting .5 gives an optimum snare drum.
+      -- ^ The range from pitch to noise is controlled by a 'roughness
+      -- factor' (0 to 1).
+      --
+      -- Zero gives the plucked string effect, while 1 reverses the polarity of every
+      -- sample (octave down, odd harmonics). The setting .5 gives an optimum snare drum.
     | StretchedDrum Double Double  
-      -- Combines both roughness and stretch factors. parm1 is
-      -- roughness (0 to 1), and parm2 the stretch factor (=1).
+      -- ^ Combines both roughness and stretch factors.
+      --
+      -- [parm1] is roughness (0 to 1), and [parm2] the stretch factor (=1).
     | WeightedAveraging Double Double 
-      -- As SimpleAveraging, with parm1 weighting the current sample
-      -- (the status quo) and iparm2 weighting the previous adjacent
-      -- one. iparm1 + iparm2must be <= 1.
+      -- ^ As SimpleAveraging, with [parm1] weighting the current sample
+      -- (the status quo) and [iparm2] weighting the previous adjacent
+      -- one. [iparm1 + iparm2] must be <= 1.
     | RecursiveFilter
-      -- 1st order recursive filter, with coefs .5. Unaffected by
+      -- ^ 1st order recursive filter, with coefs .5. Unaffected by
       -- parameter values.
 
 pluck :: forall p . Clock p => 
@@ -392,16 +381,16 @@ pluck table pitch method =
 -- Not implemented.
 
 grain :: Table 
-         -- Grain waveform. This can be just a sine wave or a sampled sound. 
+         -- ^ Grain waveform. This can be just a sine wave or a sampled sound. 
       -> Table
-         -- Amplitude envelope used for the grains.
+         -- ^ Amplitude envelope used for the grains.
       -> Double
-         -- Maximum grain duration in seconds. This is the biggest
-         -- value to be assigned to 'gdur'.
+         -- ^ Maximum grain duration in seconds. This is the biggest
+         -- value to be assigned to [gdur].
       -> Bool
-         -- If 'True', all grains will begin reading from the
-         -- beginning of the 'gfn' table.  If 'False', grains
-         -- will start reading from random 'gfn' table positions.
+         -- ^ If [True], all grains will begin reading from the
+         -- beginning of the [gfn] table.  If [False], grains
+         -- will start reading from random [gfn] table positions.
       -> Signal p (Double,Double,Double,Double,Double) Double
 grain gfn wfn mgdur grnd = 
     proc (pitch,dens,ampoff,pitchoff,gdur) -> do
@@ -410,7 +399,7 @@ grain gfn wfn mgdur grnd =
 -- Delay Lines
 -- -----------
 
--- csound's delayr and delayw are not implemented -- instead, one can use
+-- csound's [delayr] and [delayw] are not implemented -- instead, one can use
 -- a fixed-time delay with native recursive arrow syntax to achieve
 -- modified feedback loops.
 
@@ -435,8 +424,7 @@ mkArrWithTable size t = Buf size (unsafePerformIO $
     Foreign.Marshal.newArray (map (readFromTable t) [0, (1/sz)..((sz-1)/sz)]))
       where sz = fromIntegral size
 
--- A fixed-length delay line, initialized using a table.
-
+-- | A fixed-length delay line, initialized using a table.
 delayLineT :: forall p . Clock p => 
           Int -> Table -> Signal p Double Double
 delayLineT size table =
@@ -451,8 +439,7 @@ delayLineT size table =
         --       deal with strictness better without this hack?
         outA -< unsafePerformIO $ updateBuf buf i y
 
--- A fixed-length delay line.
-
+-- | A fixed-length delay line.
 delayLine :: forall p . Clock p => 
          Double -> Signal p Double Double
 delayLine maxdel =
@@ -466,8 +453,7 @@ delayLine maxdel =
           y <- delay 0 -< x  
         outA -< unsafePerformIO $ updateBuf buf i y
 
--- delay line with one tap.
-
+-- | Delay line with one tap.
 delayLine1 :: forall p . Clock p => Double -> Signal p (Double, Double) Double
 delayLine1 maxdel =
     let sr = rate (undefined :: p)
@@ -486,22 +472,19 @@ delayLine1 maxdel =
         _ <- updateBuf buf i y
         return s
 
--- delay line with two taps.
-
+-- | Delay line with two taps.
 delay2 :: Double -> Signal p (Double, Double, Double) Double
 delay2 maxdel = 
     proc (sig, dlt1, dlt2) -> do
       outA -< 0
 
--- delay line with three taps.
-
+-- | Delay line with three taps.
 delay3 :: Double -> Signal p (Double, Double, Double, Double) Double
 delay3 maxdel = 
     proc (sig, dlt1, dlt2, dlt3) -> do
       outA -< 0
 
--- delay line with four taps.
-
+-- | Delay line with four taps.
 delay4 :: Double -> Signal p (Double, Double, Double, Double, Double) Double
 delay4 maxdel = 
     proc (sig, dlt1, dlt2, dlt3, dlt4) -> do
@@ -510,11 +493,10 @@ delay4 maxdel =
 -- Noise Generators
 -- ----------------
 
--- Analogous to rand, randi, and randh in csound.
-
--- Generate uniform white noise with an R.M.S value of 1 / sqrt 2, where
--- 'seed' is the random seed.
-
+-- | Analogous to [rand], [randi], and [randh] in csound.
+--
+-- Generate uniform white noise with an R.M.S value of [1 / sqrt 2], where
+-- [seed] is the random seed.
 noiseWhite :: Int -> Signal p () Double
 noiseWhite seed =
     let gen = mkStdGen seed
@@ -524,11 +506,11 @@ noiseWhite seed =
         g <- delay gen -< g'
       outA -< a * 2 - 1
 
--- Controlled band-limited noise with interpolation between each new
--- number, and with an RMS value of 1 / sqrt 2.
--- 'cps' controls how fast the new numbers are generated.
--- 'seed' is the random seed.
-
+-- | Controlled band-limited noise with interpolation between each new
+-- number, and with an RMS value of [1 / sqrt 2].
+--
+-- [cps] controls how fast the new numbers are generated.
+-- [seed] is the random seed.
 noiseBLI :: forall p . Clock p => Int -> Signal p Double Double
 noiseBLI seed =
     let sr = rate (undefined :: p)
@@ -548,11 +530,10 @@ noiseBLI seed =
                           in (0, (n2, n3, g'))
       outA -< n * 2 - 1
 
--- Controlled band-limited noise without interpolation (holds
--- previous value instead), and with an RMS value of 1 / sqrt 2.
--- 'cps' controls how fast the new numbers are generated.
--- 'seed' is the random seed.
-
+-- | Controlled band-limited noise without interpolation (holds
+-- previous value instead), and with an RMS value of [1 / sqrt 2].
+-- [cps] controls how fast the new numbers are generated.
+-- [seed] is the random seed.
 noiseBLH :: forall p . Clock p => Int -> Signal p Double Double
 noiseBLH seed =
     let sr = rate (undefined :: p)
@@ -573,8 +554,7 @@ noiseBLH seed =
 -- Gain Adjustment
 -- ---------------
 
--- Adjusts RMS amplitude of 'sig' so that it matches RMS amplitude of 'ref'.
-
+-- | Adjusts RMS amplitude of [sig] so that it matches RMS amplitude of [ref].
 balance :: forall p . Clock p =>
            Int -> Signal p (Double, Double) Double
 balance ihp =
@@ -608,21 +588,20 @@ data BandPassData = BandPassData{
 rsnDefault :: BandPassData
 rsnDefault = BandPassData (-1) (-1) 0 0 0 0 0 0
 
--- A second-order resonant (band pass) filter.
-
--- Analogous to csound's 'reson' routine.
-
+-- | A second-order resonant (band pass) filter.
+--
+-- Analogous to csound's [reson] routine.
 filterBandPass :: forall p . Clock p =>
-         Int -- 'scale': 1 signifies a peak response factor of 1, i.e. all
+         Int -- ^ [scale]: 1 signifies a peak response factor of 1, i.e. all
              -- frequencies other than kcf are attenuated in accordance with
              -- the (normalized) response curve; 2 raises the response
              -- factor so that its overall RMS value equals 1; 0 ignifies
              -- no scaling of the signal, leaving that to some later
              -- adjustment (like balance).
       -> Signal p (Double, Double, Double) Double
-             -- 'sig' is the signal to be filtered,
-             -- 'kcf' is the center frequency of the filter,
-             -- and 'kbw' is the bandwidth of it.
+             -- ^ [sig] is the signal to be filtered,
+             -- [kcf] is the center frequency of the filter,
+             -- and [kbw] is the bandwidth of it.
 filterBandPass scale =
     proc (sig, kcf, kbw) -> do
       rec
@@ -657,11 +636,10 @@ filterBandPass scale =
           outA -< rsnData{ rsnKcf = kcf, rsnKbw = kbw, rsnCosf = cosf,
                               rsnC1  = c1,  rsnC2  = c2,  rsnC3   = c3   }
 
--- A band stop filter whose transfer function is the complement of
--- filterBandPass.
-
--- Analogous to csound's 'areson' routine.
-
+-- | A band stop filter whose transfer function is the complement of
+-- [filterBandPass].
+--
+-- Analogous to csound's [areson] routine.
 filterBandStop :: forall p. Clock p =>
                   Int -> Signal p (Double, Double, Double) Double
 filterBandStop scale = proc (sig, kcf, kbw) -> do
@@ -715,32 +693,29 @@ bbrset freq band sr = ButterData a1 a2 a3 a4 a5
         a4 = a2
         a5 = (1 - c) * a1
 
--- A second-order low-pass Butterworth filter, where 'sig' is the input
--- signal to be filtered, and 'freq' is the cutoff center frequency.
-
--- Analogous to csound's 'butterlp' routine.
-
+-- | A second-order low-pass Butterworth filter, where [sig] is the input
+-- signal to be filtered, and [freq] is the cutoff center frequency.
+--
+-- Analogous to csound's [butterlp] routine.
 filterLowPassBW :: forall p . Clock p => Signal p (Double, Double) Double
 filterLowPassBW = 
   let sr = rate (undefined :: p) 
   in proc (sig, freq) -> do
        butter -< (sig, blpset freq sr)
 
--- A high-pass Butterworth filter.
-
--- Analogous to csound's 'butterhp' routine.
-
+-- | A high-pass Butterworth filter.
+--
+-- Analogous to csound's [butterhp] routine.
 filterHighPassBW :: forall p . Clock p => Signal p (Double, Double) Double
 filterHighPassBW = 
   let sr = rate (undefined :: p)
   in proc (sig, freq) -> do
        butter -< (sig, bhpset freq sr)
 
--- A band-pass Butterworth filter where 'band' is the bandwidth.
--- 'filterBandPassBW -< (s, 2000, 100)' will pass only 1950 to 2050 Hz in 's'.
-
--- Analogous to csound's 'butterbp' routine.
-
+-- | A band-pass Butterworth filter where [band] is the bandwidth.
+-- [filterBandPassBW -< (s, 2000, 100)] will pass only 1950 to 2050 Hz in [s].
+--
+-- Analogous to csound's [butterbp] routine.
 filterBandPassBW :: forall p . Clock p => 
                     Signal p (Double, Double, Double) Double
 filterBandPassBW = 
@@ -748,12 +723,11 @@ filterBandPassBW =
   in proc (sig, freq, band) -> do
        butter -< (sig, bbpset freq band sr)
 
--- A band-stop Butterworth filter where 'band' is the bandwidth.
--- 'filterBandStopBW -< (s, 4000, 1000)' will filter 's' such that frequencies 
+-- | A band-stop Butterworth filter where [band] is the bandwidth.
+-- [filterBandStopBW -< (s, 4000, 1000)] will filter [s] such that frequencies 
 -- between 3500 to 4500 Hz are rejected.
-
--- Analogous to csound's 'butterbr' routine.
-
+--
+-- Analogous to csound's [butterbr] routine.
 filterBandStopBW :: forall p . Clock p => 
                     Signal p (Double, Double, Double) Double
 filterBandStopBW = 
@@ -761,8 +735,7 @@ filterBandStopBW =
   in proc (sig, freq, band) -> do
        butter -< (sig, bbrset freq band sr)
 
--- Helper function for various Butterworth filters.
-
+-- | Helper function for various Butterworth filters.
 butter :: Clock p => Signal p (Double,ButterData) Double
 butter = proc (sig, ButterData a1 a2 a3 a4 a5) -> do
     rec let t = sig - a4 * y' - a5 * y''
@@ -771,23 +744,23 @@ butter = proc (sig, ButterData a1 a2 a3 a4 a5) -> do
         y'' <- delay 0 -< y'
     outA -< y
 
--- This filter reiterates input with an echo density determined by loop
--- time 'looptime'.  The attenuation rate is independent and is
--- determined by 'rvt', the reverberation time (defined as the time in
--- seconds for a signal to decay to 1/1000 of, or 60dB down from, its
--- original amplitude). Output from 'filterComb' will appear only after
--- 'looptime' seconds.
-
--- Analogous to csound's 'comb' routine.
-
+-- | This filter reiterates input with an echo density determined by loop
+-- time [looptime].
+--
+-- The attenuation rate is independent and is determined by [rvt], the
+-- reverberation time (defined as the time in seconds for a signal to decay to
+-- 1/1000 of, or 60dB down from, its original amplitude). Output from
+-- [filterComb] will appear only after [looptime] seconds.
+--
+-- Analogous to csound's [comb] routine.
 filterComb :: Clock p => 
-        Double -- loop time in seconds, which determines the "echo
-               -- density" of the reverberation. This in turn
-               -- characterizes the "color" of the filter whose
-               -- frequency response curve will contain 'looptime' *
-               -- sr/2 peaks spaced evenly between 0 and sr/2 (the
-               -- Nyquist frequency).  Loop time can be as large as
-               -- available memory will permit.
+        Double -- ^ Loop time in seconds.
+
+               -- This determines the "echo density" of the reverberation. This
+               -- in turn characterizes the "color" of the filter whose
+               -- frequency response curve will contain [looptime * sr/2] peaks
+               -- spaced evenly between 0 and [sr/2] (the Nyquist frequency).
+               -- Loop time can be as large as available memory will permit.
      -> Signal p (Double, Double) Double
 filterComb looptime = 
     let log001 = -6.9078
@@ -798,12 +771,11 @@ filterComb looptime =
         r <- del -< sig + r * gain
       outA -< r
 
--- A first-order recursive low-pass filter with variable frequency
--- response. 'hp' is the response curve's half-power point, in Hertz.
+-- | A first-order recursive low-pass filter with variable frequency
+-- response. [hp] is the response curve's half-power point, in Hertz.
 -- Half power is defined as peak power / sqrt 2.
-
--- Analogous to csound's tone routine.
-
+--
+-- Analogous to csound's [tone] routine.
 filterLowPass :: forall p . Clock p => Signal p (Double,Double) Double
 filterLowPass = 
     let sr = rate (undefined :: p)
@@ -816,14 +788,15 @@ filterLowPass =
            y <- delay 0 -< y'
         outA -< y
 
--- A high-pass filter whose transfer function is the complement of that
--- of 'filterLowPass'.  The transfer function of 'filterHighPass'
--- represents the "filtered out" aspects of its complement.  However,
--- power scaling is not normalized in 'filterHighPass' but remains the
--- true complement of filterLowPass.  Thus an audio signal, filtered by
--- parallel matching 'filterLowPass' and 'filterHighPass', would under
--- addition simply reconstruct the original spectrum.
-
+-- | A high-pass filter whose transfer function is the complement of that
+-- of [filterLowPass].
+--
+-- The transfer function of [filterHighPass] represents the "filtered out"
+-- aspects of its complement.  However, power scaling is not normalized in
+-- [filterHighPass] but remains the true complement of [filterLowPass].  Thus
+-- an audio signal, filtered by parallel matching [filterLowPass] and
+-- [filterHighPass], would under addition simply reconstruct the original
+-- spectrum.
 filterHighPass :: Clock p => Signal p (Double,Double) Double
 filterHighPass = proc (sig, hp) -> do
        y <- filterLowPass -< (sig, hp)
@@ -832,19 +805,19 @@ filterHighPass = proc (sig, hp) -> do
 -- Envelopes
 -- ---------
 
--- 'envLine' generates control or audio signals whose values move linearly
--- from an initial value to a final one.  A common error with this signal
--- function is to assume that the value of 'b' is held after the time
--- 'dur'.  'envLine' does not automatically end or stop at the end of the
--- duration given. If your note length is longer than 'dur' seconds, the
--- resulting value will not come to rest at 'b', but will instead
--- continue to rise or fall with the same rate. If a rise (or fall) and
--- then hold is required then 'envLineSeg' should be considered instead.
-
+-- | Generates control or audio signals whose values move linearly
+-- from an initial value to a final one.
+--
+-- A common error with this signal function is to assume that the value of [b]
+-- is held after the time [dur]. [envLine] does not automatically end or stop
+-- at the end of the duration given. If your note length is longer than [dur]
+-- seconds, the resulting value will not come to rest at [b], but will instead
+-- continue to rise or fall with the same rate. If a rise (or fall) and then
+-- hold is required then [envLineSeg] should be considered instead.
 envLine :: forall p . Clock p => 
-        Double  -- Starting value.
-     -> Double  -- Duration in seconds.
-     -> Double  -- Value after 'dur' seconds.
+        Double  -- ^ Starting value.
+     -> Double  -- ^ Duration in seconds.
+     -> Double  -- ^ Value after [dur] seconds.
      -> Signal p () Double
 envLine a dur b =
     let sr = rate (undefined :: p)
@@ -853,13 +826,16 @@ envLine a dur b =
         y <- delay a -< y + (b-a) * (1 / sr / dur)
       outA -< y
 
--- Trace an exponential curve between specified points. 
-
+-- | Trace an exponential curve between specified points. 
 envExpon :: forall p . Clock p => 
-        Double  -- Starting value.  Zero is illegal for exponentials. 
-     -> Double  -- Duration in seconds.                
-     -> Double  -- Value after 'dur' seconds.  For exponentials,
-                -- must be non-zero and must agree in sign with 'a'.
+        Double  -- ^ Starting value.
+                --
+                -- Zero is illegal for exponentials. 
+     -> Double  -- ^ Duration in seconds.                
+     -> Double  -- ^ Value after [dur] seconds.
+                --
+                -- For exponentials, this must be non-zero and must agree in sign
+                -- with [a].
      -> Signal p () Double
 envExpon a dur b =
     let sr = rate (undefined :: p)
@@ -876,12 +852,11 @@ data Tab = Tab [Double] !Int !(UArray Int Double)
 aAt :: Tab -> Int -> Double
 aAt (Tab _ sz a) i = unsafeAt a (min (sz-1) i)
 
--- Helper function for envLineSeg and envExponSeg.
-
+-- | Helper function for [envLineSeg] and [envExponSeg].
 seghlp :: forall p . Clock p =>
-           [Double]  -- List of points to trace through.
-        -> [Double]  -- List of durations for each line segment.
-                     -- Needs to be one element fewer than 'iamps'.
+           [Double]  -- ^ List of points to trace through.
+        -> [Double]  -- ^ List of durations for each line segment.
+                     -- Needs to be one element fewer than [iamps].
         -> Signal p () (Double,Double,Double,Double)
 seghlp iamps idurs =
     let sr = rate (undefined :: p)
@@ -901,12 +876,11 @@ seghlp iamps idurs =
           d  = aAt durs i
       outA -< (a1,a2,t,d)
 
--- Trace a series of line segments between specified points.
-
+-- | Trace a series of line segments between specified points.
 envLineSeg :: Clock p => 
-           [Double]  -- List of points to trace through.
-        -> [Double]  -- List of durations for each line segment.
-                     -- Needs to be one element fewer than 'amps'.
+           [Double]  -- ^ List of points to trace through.
+        -> [Double]  -- ^ List of durations for each line segment.
+                     -- Needs to be one element fewer than [amps].
         -> Signal p () Double
 envLineSeg amps durs = 
     let sf = seghlp amps durs
@@ -914,12 +888,11 @@ envLineSeg amps durs =
       (a1,a2,t,d) <- sf -< ()
       outA -< a1 + (a2-a1) * (t / d)
 
--- Trace a series of exponential segments between specified points.
-
+-- | Trace a series of exponential segments between specified points.
 envExponSeg :: Clock p => 
-           [Double]  -- List of points to trace through.
-        -> [Double]  -- List of durations for each line segment.
-                     -- Needs to be one element fewer than 'amps'.
+           [Double]  -- ^ List of points to trace through.
+        -> [Double]  -- ^ List of durations for each line segment.
+                     -- Needs to be one element fewer than [amps].
         -> Signal p () Double
 envExponSeg ampinps durs = 
     let amps' = case ampinps of
@@ -930,17 +903,17 @@ envExponSeg ampinps durs =
       (a1,a2,t,d) <- sf -< ()
       outA -< a1 * pow (a2/a1) (t / d)
 
--- Creates a straight-line rise and decay envelope.  Rise modifications
--- are applied for the first 'rise' seconds, and decay from time 'dur' -
--- 'dec'. If these periods are separated in time there will be a steady
--- state during which the output will remain constant. If the overall
--- duration idur is exceeded in performance, the final decay will
--- continue on in the same direction, going negative.
-
+-- | Creates a straight-line rise and decay envelope.
+--
+-- Rise modifications are applied for the first [rise] seconds, and decay from
+-- time [dur - dec]. If these periods are separated in time there will be a
+-- steady state during which the output will remain constant. If the overall
+-- duration [idur] is exceeded in performance, the final decay will continue on
+-- in the same direction, going negative.
 envASR :: (Clock p) =>
-         Double  -- rise time in seconds.
-      -> Double  -- overall duration in seconds.
-      -> Double  -- decay time in seconds.
+         Double  -- ^ Rise time in seconds.
+      -> Double  -- ^ Overall duration in seconds.
+      -> Double  -- ^ Decay time in seconds.
       -> Signal p () Double
 envASR rise dur dec = 
     let sf = envLineSeg [0,1,1,0] [rise, dur-rise-dec, dec]
@@ -948,43 +921,43 @@ envASR rise dur dec =
       env <- sf -< ()
       outA -< env
 
--- Apply an envelope consisting of 3 segments:
+-- | Apply an envelope consisting of 3 segments.
+--
+-- The segments are as follows:
 --   1. stored function rise shape
 --   2. modified exponential pseudo steady state
 --   3. exponential decay
-
--- Rise modifications are applied for the first 'rise' seconds, and decay
--- from time 'dur' - 'dec'. If these periods are separated in time the
+--
+-- Rise modifications are applied for the first [rise] seconds, and decay
+-- from time [dur - dec]. If these periods are separated in time the
 -- output will be modified by the first exponential pattern. If rise and
 -- decay periods overlap then both modifications will be in effect for
--- that time. If the overall duration 'dur' is exceeded in performance,
+-- that time. If the overall duration [dur] is exceeded in performance,
 -- the final decay will continue on in the same direction, tending
 -- asymptotically to zero.
-
 envCSEnvlpx :: forall p . Clock p =>
-          Double  -- rise time in seconds.
-       -> Double  -- overall duration in seconds.
-       -> Double  -- decay time in seconds.
-       -> Table   -- table of stored rise shape.
+          Double  -- ^ Rise time in seconds.
+       -> Double  -- ^ Overall duration in seconds.
+       -> Double  -- ^ Decay time in seconds.
+       -> Table   -- ^ Table of stored rise shape.
        -> Double  
-          -- attenuation factor, by which the last value of the
-          -- 'envCSEnvlpx' rise is modified during the note's pseudo
-          -- steady state. A factor greater than 1 causes an
-          -- exponential growth and a factor less than 1 creates an
-          -- exponential decay. A factor of 1 will maintain a true
-          -- steady state at the last rise value. Note that this
-          -- attenuation is not by fixed rate (as in a piano), but
-          -- is sensitive to a note's duration. However, if 'atss'
-          -- is negative (or if steady state < 4 k-periods) a fixed
-          -- attenuation rate of 'abs' 'atss' per second will be
-          -- used. 0 is illegal.
+          -- ^ Attenuation factor by which the last value of the [envCSEnvlpx]
+          -- rise is modified during the note's pseudo steady state.
+          --
+          -- A factor greater than 1 causes an exponential growth and a factor
+          -- less than 1 creates an exponential decay. A factor of 1 will
+          -- maintain a true steady state at the last rise value. Note that
+          -- this attenuation is not by fixed rate (as in a piano), but is
+          -- sensitive to a note's duration. However, if [atss] is negative (or
+          -- if steady state < 4 k-periods) a fixed attenuation rate of [abs *
+          -- atss] per second will be used. 0 is illegal.
        -> Double  
-          -- attenuation factor by which the closing steady state
-          -- value is reduced exponentially over the decay
-          -- period. This value must be positive and is normally of
-          -- the order of .01. A large or excessively small value is
-          -- apt to produce a cutoff which is audible. A zero or
-          -- negative value is illegal.
+          -- ^ Attenuation factor by which the closing steady state value is
+          -- reduced exponentially over the decay period.
+          --
+          -- This value must be positive and is normally of the order of .01. A
+          -- large or excessively small value is apt to produce a cutoff which
+          -- is audible. A zero or negative value is illegal.
        -> Signal p () Double
 envCSEnvlpx rise dur dec tab atss atdec = 
     let sr     = rate (undefined :: p)
@@ -1021,17 +994,16 @@ type EndPt           = Double
 type DoubleSegFun = 
   (Double, StartPt) -> [(SegLength, EndPt)] -> Double -> Double
 
--- Analgous to csound's gen05 routine.
-
+-- | Analgous to csound's [gen05] routine.
 tableExponN :: TableSize
-         -- The size of the table to be produced. 
+         -- ^ The size of the table to be produced. 
      ->  StartPt
-         -- The y-coordinate for the start point, (0,y). 
+         -- ^ The y-coordinate for the start point, (0,y). 
      -> [(SegLength, EndPt)]
-         -- Pairs of segment lengths and y-coordinates. The segment
-         -- lengths are the projection along the x-axis. The first
-         -- pair will define the line from (0, startPt) to (segLength,
-         -- endPt).
+         -- ^ Pairs of segment lengths and y-coordinates.
+         --
+         -- The segment lengths are the projection along the x-axis. The first
+         -- pair will define the line from (0, [startPt]) to ([segLength], [endPt]).
      -> Table
 tableExponN  size sp segs = tableExp_ sp segs True size
 tableExpon :: Int -> StartPt -> [(SegLength, EndPt)] -> Table
@@ -1039,17 +1011,16 @@ tableExpon size sp segs   = tableExp_ sp segs False size
 tableExp_ :: StartPt -> [(SegLength, EndPt)] -> Bool -> Int -> Table
 tableExp_ sp segs = funToTable (interpLine sp segs interpExpLine) 
 
--- Analogous to csound's gen07 routine.
-
+-- | Analogous to csound's [gen07] routine.
 tableLinearN :: TableSize
-         -- The size of the table to be produced. 
+         -- ^ The size of the table to be produced. 
      ->  StartPt
-         -- The y-coordinate for the start point, (0,y). 
+         -- ^ The y-coordinate for the start point, (0,y). 
      -> [(SegLength, EndPt)]
-         -- Pairs of segment lengths and y-coordinates. The segment
-         -- lengths are the projection along the x-axis. The first
-         -- pair will define the line from (0, startPt) to (segLength,
-         -- endPt).
+         -- ^ Pairs of segment lengths and y-coordinates.
+         --
+         -- The segment lengths are the projection along the x-axis. The first
+         -- pair will define the line from (0, [startPt]) to ([segLength], [endPt]).
      -> Table
 tableLinearN  size sp segs = tableLin_ sp segs True size
 tableLinear :: Int -> StartPt -> [(SegLength, EndPt)] -> Table
@@ -1057,15 +1028,14 @@ tableLinear   size sp segs = tableLin_ sp segs False size
 tableLin_ :: StartPt -> [(SegLength, EndPt)] -> Bool -> Int -> Table
 tableLin_     sp segs  = funToTable (interpLine sp segs interpStraightLine) 
 
--- Make a table from a collection of sine waves at different delays and
+-- | Make a table from a collection of sine waves at different delays and
 -- strengths.
-
+--
 -- Analogous to csound's gen09 routine.
-
 tableSines3N :: TableSize
-         -- The size of the table to be produced.
+         -- ^ The size of the table to be produced.
       -> [(PartialNum, PartialStrength, PhaseOffset)]
-         -- List of triples of the partial (0,1,...), partial
+         -- ^ List of triples of the partial (0,1,...), partial
          -- strength on [0,1], and phase delay on [0,360].
       -> Table
 tableSines3N  size ps = tableSines3_ ps True size
@@ -1078,8 +1048,7 @@ tableSinesF :: (Floating a, Enum a) => [a] -> a -> a
 tableSinesF pss x = let phase = 2 * pi * x 
                in sum (zipWith (*) [ sin (phase * pn) | pn <- [1..] ] pss)
 
--- Analogous to csound's gen10 routine.
-
+-- | Analogous to csound's [gen10] routine.
 tableSinesN :: TableSize -> [PartialStrength] -> Table
 tableSinesN  size pss = tableSinesN_ pss True size
 tableSines :: Int -> [Double] -> Table
@@ -1087,13 +1056,12 @@ tableSines   size pss = tableSinesN_ pss False size
 tableSinesN_ :: [Double] -> Bool -> Int -> Table
 tableSinesN_ pss = funToTable (tableSinesF pss)
 
--- Generates the log of a modified Bessel function of the second kind,
+-- | Generates the log of a modified Bessel function of the second kind,
 -- order 0, suitable for use in amplitude-modulated FM.
-
--- Analogous to csound's gen12 routine.
-
+--
+-- Analogous to csound's [gen12] routine.
 tableBesselN :: TableSize 
-      -> Double  -- specifies the x interval [0 to +xint] over which
+      -> Double  -- ^ Specifies the x interval [0 to +xint] over which
                  -- the function is defined.
       -> Table
 tableBesselN  size xint = tableBess_ xint True size
@@ -1109,8 +1077,7 @@ tableBessF xint x =
                                0.2659732, 0.0360768, 0.0045813 ]
                $ iterate (*tsquare) tsquare
 
--- Utility functions for tableExpon and tableLinear.
-
+-- | Utility functions for [tableExpon] and [tableLinear].
 normalizeSegs :: [(SegLength, entPt)] -> [(SegLength, entPt)]
 normalizeSegs segs =
     let s = sum (map fst segs)
@@ -1118,22 +1085,21 @@ normalizeSegs segs =
     in  map (\(x,y) -> (x*fact, y)) segs
 
 interpLine :: StartPt
-              -- The y-coordinate for the start point (0,y).
+              -- ^ The y-coordinate for the start point (0,y).
            -> [(SegLength, EndPt)]
-              -- Pairs of segment lengths (projected on the x-axis)
+              -- ^ Pairs of segment lengths (projected on the x-axis)
               -- and y-coordinates (end points).
            -> DoubleSegFun
-              -- The function to use for interpolation
+              -- ^ The function to use for interpolation
            -> Double
-              -- The x-coordinate for which to find the
+              -- ^ The x-coordinate for which to find the
               -- corresponding f(x)=y.
            -> Double
 interpLine sp [] d f = 0 -- catchall case
 interpLine sp points f d = f (0,sp) (normalizeSegs points) d 
 
--- The exponential interpolation function stretches e^x between two 
+-- | The exponential interpolation function stretches e^x between two 
 -- endpoints for each pair of points.
-
 interpExpLine :: (Double, StartPt)
                  -- The startpoing as (x,y)
               -> [(SegLength, EndPt)]
@@ -1152,12 +1118,12 @@ interpExpLine (s1, e1) ((s2, e2):t) d =
          abs h * (exp (x/s2) - 1) / exp 1 - 1 + min e1 e2
 
 interpStraightLine :: (Double, StartPt)
-                 -- The startpoing as (x,y)
+                 -- ^ The startpoing as (x,y)
               -> [(SegLength, EndPt)]
-                 -- A list of line segments with (x',y) where x' is
+                 -- ^ A list of line segments with (x',y) where x' is
                  -- a length projected on the x-axis
               -> Double
-                 -- The target x-coordinate to find a corresponding
+                 -- ^ The target x-coordinate to find a corresponding
                  -- y value for
               -> Double
 interpStraightLine (s1, e1) [] d = e1 -- termination case, end of list
@@ -1168,27 +1134,25 @@ interpStraightLine (s1, e1) ((s2, e2):t) d =
     in   if s2<=0 then e2 else 
          e1 + (s*d) -- start point plus slope times distance
 
--- Function to find a particular point at a particular strength
-
+-- | Find a particular point at a particular strength.
 makeSineFun :: (PartialNum, PartialStrength, PhaseOffset)
-                -- Triple of the partial (0,1,...), partial strength
+                -- ^ Triple of the partial (0,1,...), partial strength
                 -- on [0,1], and phase delay on [0,360].
              -> Double
-                -- The x coordinate for which to find f(x)=y
+                -- ^ The x coordinate for which to find f(x)=y
              -> Double
 makeSineFun (pNum, pStrength, pOffset) x = 
     let x' = x * 2 * pi -- convert [0,1] to [0,pi] radians
         po = (pOffset/360) * 2 * pi -- convert [0,360] to [0,pi] radians
     in  pStrength * sin (x' * pNum + po)
 
--- For a particular point, sum all partials.
-
+-- | For a particular point, sum all partials.
 makeCompositeSineFun :: [(PartialNum, PartialStrength, PhaseOffset)]
-                        -- List of triples of the partial (0,1,...),
+                        -- ^ List of triples of the partial (0,1,...),
                         -- partial strength on [0,1], and phase delay
                         -- on [0,360].
                      -> Double
-                        -- The x coordinate for which to find f(x)=y
+                        -- ^ The x coordinate for which to find f(x)=y
                      -> Double
 makeCompositeSineFun ps x = foldr (\ p -> (+) (makeSineFun p x)) 0 ps
 

@@ -4,6 +4,7 @@ module Control.Arrow.ArrowP where
 
 import Control.Arrow
 import Control.Arrow.Operations
+
 #if __GLASGOW_HASKELL__ >= 610
 import Control.Category
 import Prelude hiding ((.), id)

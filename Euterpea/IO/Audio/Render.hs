@@ -1,9 +1,8 @@
 {-# LANGUAGE Arrows, ScopedTypeVariables, NamedFieldPuns, FlexibleContexts #-}
 
--- Render a Music object to a audio signal function that can be further
+-- | Render a Music object to a audio signal function that can be further
 -- manipulated or saved to a file.  It is channel-agnostic in that it is
 -- able to deal with instruments of arbitrary number of channels.
-
 module Euterpea.IO.Audio.Render (
   Instr, InstrMap, renderSF, 
 ) where
@@ -22,8 +21,8 @@ import Data.List
 import qualified Data.IntMap as M
 import Data.Ord (comparing)
 
--- Every instrument is a function that takes a duration, absolute
--- pitch, volume, and a list of parameters (Doubles).  What the function 
+-- | Every instrument is a function that takes a duration, absolute
+-- pitch, volume, and a list of parameters ([Double]s).  What the function 
 -- actually returns is implementation independent.
 type Instr a = Dur -> AbsPitch -> Volume -> [Double] -> a
 
@@ -36,19 +35,19 @@ lookupInstr ins im =
       Nothing -> error $ "Instrument " ++ show ins ++ 
                  " does not have a matching Instr in the supplied InstrMap."
 
--- Each note in a Performance is tagged with a unique NoteId, which
+-- | Each note in a [Performance] is tagged with a unique [NoteId], which
 -- helps us keep track of the signal function associated with a note.
 type NoteId = Int
 
--- In this particular implementation, 'a' is the signal function that
+-- | In this particular implementation, [a] is the signal function that
 -- plays the given note.
 data NoteEvt a = NoteOn  NoteId a
                | NoteOff NoteId
 
-type Evt a = (Double, NoteEvt a) -- Timestamp in seconds, and the note event
+type Evt a = (Double, NoteEvt a) -- ^ Timestamp in seconds, and the note event.
 
 
--- Turn an Event into a NoteOn and a matching NoteOff with the same NodeId.  
+-- | Turn an Event into a [NoteOn] and a matching [NoteOff] with the same [NodeId].  
 eventToEvtPair :: InstrMap a -> MEvent -> Int -> [Evt a]
 eventToEvtPair imap MEvent {eTime, eInst, ePitch, eDur, eVol, eParams} nid =
     let instr = lookupInstr eInst imap
@@ -57,8 +56,9 @@ eventToEvtPair imap MEvent {eTime, eInst, ePitch, eDur, eVol, eParams} nid =
         sf    = instr eDur ePitch eVol eParams
     in [(tOn, NoteOn nid sf), (tOn + tDur, NoteOff nid)]
 
--- Turn a Performance into an SF of NoteOn/NoteOffs.  
--- For each note, generate a unique id to tag the NoteOn and NoteOffs.
+-- | Turn a [Performance] into an [SF] of [NoteOn]/[NoteOff]s.
+--
+-- For each note, generate a unique id to tag the [NoteOn] and [NoteOff]s.
 -- The tag is used as the key to the collection of signal functions
 -- for efficient insertion/removal.
 toEvtSF :: Clock p => [MEvent] -> InstrMap a -> Signal p () [Evt a]
@@ -75,19 +75,19 @@ toEvtSF pf imap =
              -- retaining the rest
          outA -< evs
 
--- Modify the collection upon receiving NoteEvts.  The timestamps 
--- are not used here, but they are expected to be the same.
-
+-- | Modify the collection upon receiving [NoteEvts].
+--
+-- The timestamps are not used here, but they are expected to be the same.
 modSF :: M.IntMap a -> [Evt a] -> M.IntMap a
 modSF = foldl' mod
     where mod m (_, NoteOn nid sf)  = M.insert nid sf m
           mod m (_, NoteOff nid)    = M.delete nid m
 
 
--- Simplified version of a parallel switcher.  
--- Note that this is tied to the particular implementation of SF, as it
--- needs to use runSF to run all the signal functions in the collection.
-
+-- | Simplified version of a parallel switcher.  
+--
+-- Note that this is tied to the particular implementation of [SF], as it
+-- needs to use [runSF] to run all the signal functions in the collection.
 pSwitch :: forall p col a. (Clock p, Functor col) =>
            col (Signal p () a)  -- Initial SF collection.
         -> Signal p () [Evt (Signal p () a)]    -- Input event stream.
